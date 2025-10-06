@@ -1,5 +1,5 @@
 """
-This file contains main game logic in a Game class
+This file contains the main game logic in a Game class
 This class is invoked in main.py file
 Update method of this class is called every 0.02 seconds (60 FPS (Depends on what the value of self.MAX_FPS is))
 """
@@ -10,7 +10,7 @@ from objects import *
 
 class Game:
     """
-    Root Wars game class
+    Game class
     """
 
     def __init__(self, app):
@@ -22,9 +22,7 @@ class Game:
         self.version = "1.0"
 
         self.objects = []
-        self.bullets = []
-        self.cords = [0, 0]
-        self.camera = Camera(self, self.app.WIDTH, self.app.HEIGHT)
+        self.cords = [self.app.WIDTH // 2, self.app.HEIGHT // 2]
 
         self.counter = 0
 
@@ -40,7 +38,6 @@ class Game:
             """ Clears all variables of all modes except settings """
 
             self.objects.clear()
-            self.bullets.clear()
 
         if mode == "game":
             self.mode = mode
@@ -50,32 +47,53 @@ class Game:
     def create_game_objects(self):
         """ Creates game objects """
 
-        self.objects.append(Enemy(self, pos=[500, 500], size=20))
-        self.objects.append(Enemy(self, pos=[500, 500], size=20))
-        self.objects.append(Enemy(self, pos=[500, 500], size=20))
-        self.objects.append(Enemy(self, pos=[500, 500], size=20))
-        self.player = Player(self, pos=[1300, 300], size=20, color=(0, 0, 255))
-        self.objects.append(self.player)
-        # [self.objects.append(Rock(self, [random.randint(0, self.app.WIDTH),
-        #                                  random.randint(0, self.app.HEIGHT)])) for _ in range(10)]
-        # [self.objects.append(Explosive(self, [random.randint(0, self.app.WIDTH),
-        #                                  random.randint(0, self.app.HEIGHT)])) for _ in range(50)]
-        # self.objects.append(Bullet(self, pos=[500, 500], end_pos=[1000, 600]))
+        self.line = Line(self, [-200, 0], [200, 0])
+        self.circle = Circle(self, [self.app.WIDTH // 2, self.app.HEIGHT // 2], 100)
+
+        self.objects.append(self.line)
+        self.objects.append(self.circle)
+
+    def raycast_light(self, origin, circle_center, circle_radius, ray_count=360, max_length=500):
+        for angle in range(0, ray_count):
+            rad = math.radians(angle)
+            x, y = origin
+            for i in range(max_length):
+                x += math.cos(rad)
+                y += math.sin(rad)
+
+                dx = x - circle_center[0]
+                dy = y - circle_center[1]
+                dist_to_circle = math.sqrt(dx * dx + dy * dy)
+
+                # Проверяем, внутри ли окружности
+                if dist_to_circle <= circle_radius:
+                    # Затухание по расстоянию от мыши
+                    dist_from_origin = math.sqrt((x - origin[0]) ** 2 + (y - origin[1]) ** 2)
+                    intensity = max(0, 255 - int(dist_from_origin * 1.2))  # коэффициент 1.2 можно менять
+                    color = (intensity, intensity, intensity)
+                    self.app.DISPLAY.set_at((int(x), int(y)), color)
+                else:
+                    if i > circle_radius:
+                        break
 
     def update(self, mouse_buttons, mouse_position, events, keys):
         """ Main game logic """
 
         if self.mode == "game":
-            self.app.DISPLAY.fill((100, 100, 100))
+            self.app.DISPLAY.fill((0, 0, 0))
 
-            for obj in self.objects:
-                # obj.pos = self.camera.apply(obj.pos)
-                obj.update()
-                # obj.pos = mouse_position
-            for bullet in self.bullets:
-                bullet.update()
+            self.mouse_position = mouse_position
+            self.mouse_buttons = mouse_buttons
 
-            self.player.update(keys, mouse_position, mouse_buttons)
+            # for obj in self.objects:
+            #     obj.update()
+
+            pygame.draw.circle(self.app.DISPLAY, (255, 0, 0), self.circle.center, self.circle.radius, 2)
+
+            # self.circle.center = Pos.sub_pos(mouse_position, self.cords)
+
+            pygame.draw.circle(self.app.DISPLAY, (255, 0, 0), self.circle.center, self.circle.radius, 2)
+            self.raycast_light(self.mouse_position, self.circle.center, self.circle.radius)
 
             self.counter += 1
             if self.counter > 1000:

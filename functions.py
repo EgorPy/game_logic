@@ -3,6 +3,89 @@
 import math
 
 
+class Pos:
+    """ Basic class for interpreting something that has position """
+
+    def __init__(self, pos=None):
+        if pos is None:
+            self.pos = [0, 0]
+        else:
+            self.pos = pos
+
+    @staticmethod
+    def add_pos(pos1: list, pos2: list) -> list:
+        """ Adds coordinates """
+
+        return [pos1[0] + pos2[0], pos1[1] + pos2[1]]
+
+    @staticmethod
+    def sub_pos(pos1: list, pos2: list) -> list:
+        """ Subtracts coordinates """
+
+        return [pos1[0] - pos2[0], pos1[1] - pos2[1]]
+
+    @staticmethod
+    def inv_sub_pos(pos1: list, pos2: list) -> list:
+        """ Subtracts and inverts coordinates """
+
+        return [pos2[0] - pos1[0], pos2[1] - pos1[1]]
+
+    @staticmethod
+    def mul_pos(pos1: list, pos2: list) -> list:
+        """ Multiplies coordinates """
+
+        return [pos1[0] * pos2[0], pos1[1] * pos2[1]]
+
+    @staticmethod
+    def div_pos(pos1: list, pos2: list) -> list:
+        """ Divides coordinates """
+
+        return [pos1[0] / pos2[0], pos1[1] / pos2[1]]
+
+    @staticmethod
+    def inv_div_pos(pos1: list, pos2: list) -> list:
+        """ Divides and inverts coordinates"""
+
+        return [pos2[0] / pos1[0], pos2[1] / pos1[1]]
+
+
+class Vector(Pos):
+    """ Class that represents vectors """
+
+    def __init__(self, pos1=None, pos2=None):
+        super().__init__()
+        if pos1 is None:
+            self.pos1 = [0, 0]
+        else:
+            self.pos1 = pos1
+        if pos2 is None:
+            self.pos2 = [0, 0]
+        else:
+            self.pos2 = pos2
+        self.length = self.get_length()
+        self.angle = self.get_angle()
+
+    def get_length(self):
+        """ Returns length of a vector """
+
+        return distance(self.pos1, self.pos2)
+
+    def get_angle(self):
+        """
+        Returns vector angle.
+
+        y: vertical size of a vector.
+        l: length of a vector.
+        """
+
+        y = self.sub_pos(self.pos2, self.pos1)[1]
+        length = self.get_length()
+        if length != 0:
+            return rad_to_deg(math.sin(y / length))
+        else:
+            return 180
+
+
 def move_dir(angle, speed):
     """ Moves object in specific direction """
 
@@ -45,52 +128,108 @@ def touched_right(x1: int, width1: int, x2: int, width2: int) -> bool:
         return True
 
 
-def line_circle_intersection(line_start, line_end, circle_center, circle_radius):
-    """Finds intersection points between a line segment and a circle"""
+# def line_circle_intersection(line_start, line_end, circle_center, circle_radius):
+#     """ Finds intersection points between a line segment and a circle """
+#
+#     # Extract points
+#     x1, y1 = line_start
+#     x2, y2 = line_end
+#     cx, cy = circle_center
+#     r = circle_radius
+#
+#     # Vector from start to end of the line
+#     dx = x2 - x1
+#     dy = y2 - y1
+#
+#     # Vector from start of the line to the circle's center
+#     fx = x1 - cx
+#     fy = y1 - cy
+#
+#     # Quadratic equation coefficients
+#     a = dx ** 2 + dy ** 2
+#     b = 2 * (fx * dx + fy * dy)
+#     c = fx ** 2 + fy ** 2 - r ** 2
+#
+#     # Discriminant of the quadratic equation
+#     discriminant = b ** 2 - 4 * a * c
+#
+#     if discriminant < 0:
+#         return None  # No intersection
+#
+#     # Compute the parameter `t` for the intersection points
+#     discriminant_sqrt = math.sqrt(discriminant)
+#     t1 = (-b - discriminant_sqrt) / (2 * a)
+#     t2 = (-b + discriminant_sqrt) / (2 * a)
+#
+#     # Store intersection points
+#     # intersection_points = []
+#
+#     # Check if t1 lies within the segment [0, 1]
+#     if 0 <= t1 <= 1:
+#         return [x1 + t1 * dx, y1 + t1 * dy]
+#
+#     # Check if t2 lies within the segment [0, 1]
+#     if 0 <= t2 <= 1:
+#         return [x1 + t2 * dx, y1 + t2 * dy]
+#
+#     # Return the intersection points if any, otherwise None
+#     return None
 
-    # Extract points
+def point_in_circle(point, center, radius):
+    dx = point[0] - center[0]
+    dy = point[1] - center[1]
+    return dx * dx + dy * dy <= radius * radius
+
+
+def line_circle_intersection(line_start, line_end, circle_center, circle_radius):
+    """ Проверяет, пересекается ли отрезок с окружностью """
+
     x1, y1 = line_start
     x2, y2 = line_end
     cx, cy = circle_center
     r = circle_radius
 
-    # Vector from start to end of the line
+    # Вектор линии
     dx = x2 - x1
     dy = y2 - y1
 
-    # Vector from start of the line to the circle's center
+    # Квадратичные коэффициенты
     fx = x1 - cx
     fy = y1 - cy
 
-    # Quadratic equation coefficients
-    a = dx ** 2 + dy ** 2
+    a = dx * dx + dy * dy
     b = 2 * (fx * dx + fy * dy)
-    c = fx ** 2 + fy ** 2 - r ** 2
+    c = fx * fx + fy * fy - r * r
 
-    # Discriminant of the quadratic equation
-    discriminant = b ** 2 - 4 * a * c
-
+    discriminant = b * b - 4 * a * c
     if discriminant < 0:
-        return None  # No intersection
+        return False  # нет пересечения
 
-    # Compute the parameter `t` for the intersection points
-    discriminant_sqrt = math.sqrt(discriminant)
-    t1 = (-b - discriminant_sqrt) / (2 * a)
-    t2 = (-b + discriminant_sqrt) / (2 * a)
+    discriminant = math.sqrt(discriminant)
 
-    # Store intersection points
-    # intersection_points = []
+    t1 = (-b - discriminant) / (2 * a)
+    t2 = (-b + discriminant) / (2 * a)
 
-    # Check if t1 lies within the segment [0, 1]
-    if 0 <= t1 <= 1:
-        return [x1 + t1 * dx, y1 + t1 * dy]
+    # Проверяем, лежит ли точка пересечения на отрезке
+    if (0 <= t1 <= 1) or (0 <= t2 <= 1):
+        return True
+    return False
 
-    # Check if t2 lies within the segment [0, 1]
-    if 0 <= t2 <= 1:
-        return [x1 + t2 * dx, y1 + t2 * dy]
 
-    # Return the intersection points if any, otherwise None
-    return None
+# def line_circle_intersection(line_start, line_end, circle_center, circle_radius):
+#     """ Finds intersection between line and circle """
+#
+#     vector = Pos.sub_pos(line_end, line_start)
+#     a = vector[0]
+#     b = vector[1]
+#     if a != 0 or b != 0:
+#         d = abs(b * circle_center[0] + a * circle_center[1]) / ((a ** 2 + b ** 2) ** 0.5)
+#     else:
+#         return False
+#     # print(d, circle_radius)
+#     if d <= circle_radius:
+#         return True
+#     return False
 
 
 def line_line_intersection(p1, p2, p3, p4):
@@ -174,13 +313,8 @@ def rgb_to_hex(r=0, g=0, b=0) -> str:
         2, "0").upper()
 
 
-def distance(pos1=None, pos2=None) -> float:
+def distance(pos1: list, pos2: list) -> float:
     """ Gets distance between two positions using Pythagorean theorem """
-
-    if pos1 is None:
-        pos1 = [0, 0]
-    if pos2 is None:
-        pos2 = [500, 500]
 
     x_distance = pos1[0] - pos2[0]
     y_distance = pos1[1] - pos2[1]

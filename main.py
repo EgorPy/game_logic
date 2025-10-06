@@ -8,5 +8,5 @@ __author__ = "Egor Mironov"
 from base_app import App
 
 if __name__ == "__main__":
-    app = App("Game logic test (Enemies, physics, logic)")
+    app = App("Game logic test (Enemies, physics, logic)", width=1280, height=720, display_mode=16)
     app.run()

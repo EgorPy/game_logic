@@ -32,84 +32,7 @@ def rotate(image, pos, origin_pos, angle):
     return rotated_image, [origin[0] + 25, origin[1] + 25]
 
 
-class Pos:
-    """ Basic class for interpreting something that has position """
 
-    def __init__(self, pos=None):
-        if pos is None:
-            self.pos = [0, 0]
-        else:
-            self.pos = pos
-
-    @staticmethod
-    def add_pos(pos1: list, pos2: list) -> list:
-        """ Adds coordinates """
-
-        return [pos1[0] + pos2[0], pos1[1] + pos2[1]]
-
-    @staticmethod
-    def sub_pos(pos1: list, pos2: list) -> list:
-        """ Subtracts coordinates """
-
-        return [pos1[0] - pos2[0], pos1[1] - pos2[1]]
-
-    @staticmethod
-    def inv_sub_pos(pos1: list, pos2: list) -> list:
-        """ Subtracts and inverts coordinates """
-
-        return [pos2[0] - pos1[0], pos2[1] - pos1[1]]
-
-    @staticmethod
-    def mul_pos(pos1: list, pos2: list) -> list:
-        """ Multiplies coordinates """
-
-        return [pos1[0] * pos2[0], pos1[1] * pos2[1]]
-
-    @staticmethod
-    def div_pos(pos1: list, pos2: list) -> list:
-        """ Divides coordinates """
-
-        return [pos1[0] / pos2[0], pos1[1] / pos2[1]]
-
-    @staticmethod
-    def inv_div_pos(pos1: list, pos2: list) -> list:
-        """ Divides and inverts coordinates"""
-
-        return [pos2[0] / pos1[0], pos2[1] / pos1[1]]
-
-
-class Vector(Pos):
-    """ Class that represents vectors """
-
-    def __init__(self, pos1=None, pos2=None):
-        super().__init__()
-        if pos1 is None:
-            self.pos1 = [0, 0]
-        else:
-            self.pos1 = pos1
-        if pos2 is None:
-            self.pos2 = [0, 0]
-        else:
-            self.pos2 = pos2
-        self.length = self.get_length()
-        self.angle = self.get_angle()
-
-    def get_length(self):
-        """ Returns length of a vector """
-
-        return distance(self.pos1, self.pos2)
-
-    def get_angle(self):
-        """
-        Returns vector angle.
-
-        y: vertical size of a vector.
-        l: length of a vector.
-        """
-
-        y = self.sub_pos(self.pos2, self.pos1)[1]
-        length = self.get_length()
-        return rad_to_deg(math.sin(y / length))
 
 
 class Surface(Pos):
@@ -530,6 +453,45 @@ class Line(Vector):
                          self.width)
 
 
+class Abstract3dLine:
+    """ Line for 3d ray cast rendering """
+
+    def __init__(self, game, pos1=None, pos2=None, color=(255, 255, 255), width=5):
+        self.game = game
+
+        if pos1 is None:
+            self.pos1 = [0, 0, 0]
+        else:
+            self.pos1 = pos1
+        if pos2 is None:
+            self.pos2 = [0, 0, 0]
+        else:
+            self.pos2 = pos2
+        self.color = color
+        self.width = width
+
+    def update(self):
+        """ Draws the Line on game app display """
+
+        pygame.draw.line(self.game.app.DISPLAY, self.color,
+                         [self.pos1[0] + self.game.cords[0], self.pos1[1] + self.game.cords[1]],
+                         [self.pos2[0] + self.game.cords[0], self.pos2[1] + self.game.cords[1]],
+                         self.width)
+
+class Circle:
+    def __init__(self, game, center: list, radius: int, color=(255, 255, 255), width=5):
+        self.game = game
+        self.center = center
+        self.radius = radius
+        self.color = color
+        self.width = width
+
+    def update(self):
+        """ Draw circle """
+
+        pygame.draw.circle(self.game.app.DISPLAY, self.color, Pos.add_pos(self.center, self.game.cords), self.radius, self.width)
+
+
 class Bullet:
     """ Bullet class """
 
@@ -566,7 +528,8 @@ class Bullet:
 class Enemy:
     """ Interesting enemy class """
 
-    def __init__(self, game, pos=None, size=None, color=(255, 0, 0), angle=0, speed=5, health=50):
+    def __init__(self, game, pos=None, size=None, color=(255, 0, 0), angle=0, speed=5, health=1, anchor_point=None, debug=True,
+                 vision_angle=180, detect_range=300, stop_range=100, damaged=False):
         self.game = game
         if pos is None:
             self.pos = [0, 0]
@@ -581,12 +544,17 @@ class Enemy:
         self.new_angle = int(angle)
         self.new_pos = list(self.pos)
 
-        self.detect_range = 300
-        self.vision_angle = 180
+        self.debug = debug
+        self.detect_range = detect_range
+        self.vision_angle = vision_angle
+        self.stop_range = stop_range
         self.walk_range = 100
-        self.anchor_point = list(self.pos)
+        if anchor_point is None:
+            self.anchor_point = list(self.pos)
+        else:
+            self.anchor_point = anchor_point
         self.walk_point = None
-        self.damaged = False
+        self.damaged = damaged
         self.speed = speed
         self.health = health
 
@@ -607,21 +575,22 @@ class Enemy:
         #                  [self.pos[0] + math.cos(deg_to_rad(self.angle)) * self.detect_range,
         #                   self.pos[1] + math.sin(deg_to_rad(self.angle)) * self.detect_range], 2)
         pygame.draw.circle(self.game.app.DISPLAY, self.color, self.pos, self.size)
-        pygame.draw.polygon(self.game.app.DISPLAY, self.color,
-                            [self.pos,
-                             [self.pos[0] + math.cos(deg_to_rad(self.angle - self.vision_angle // 2)) * self.detect_range,
-                              self.pos[1] + math.sin(deg_to_rad(self.angle - self.vision_angle // 2)) * self.detect_range],
-                             [self.pos[0] + math.cos(deg_to_rad(self.angle)) * self.detect_range,
-                              self.pos[1] + math.sin(deg_to_rad(self.angle)) * self.detect_range],
-                             [self.pos[0] + math.cos(deg_to_rad(self.angle + self.vision_angle // 2)) * self.detect_range,
-                              self.pos[1] + math.sin(deg_to_rad(self.angle + self.vision_angle // 2)) * self.detect_range]
-                             ], 2)
-        pygame.draw.circle(self.game.app.DISPLAY, self.color, self.anchor_point, self.walk_range, 2)
-        pygame.draw.circle(self.game.app.DISPLAY, self.color, self.anchor_point, 10, 2)
+        if self.debug:
+            pygame.draw.polygon(self.game.app.DISPLAY, self.color,
+                                [self.pos,
+                                 [self.pos[0] + math.cos(deg_to_rad(self.angle - self.vision_angle // 2)) * self.detect_range,
+                                  self.pos[1] + math.sin(deg_to_rad(self.angle - self.vision_angle // 2)) * self.detect_range],
+                                 [self.pos[0] + math.cos(deg_to_rad(self.angle)) * self.detect_range,
+                                  self.pos[1] + math.sin(deg_to_rad(self.angle)) * self.detect_range],
+                                 [self.pos[0] + math.cos(deg_to_rad(self.angle + self.vision_angle // 2)) * self.detect_range,
+                                  self.pos[1] + math.sin(deg_to_rad(self.angle + self.vision_angle // 2)) * self.detect_range]
+                                 ], 2)
+            pygame.draw.circle(self.game.app.DISPLAY, self.color, self.anchor_point, self.walk_range, 2)
+            pygame.draw.circle(self.game.app.DISPLAY, self.color, self.anchor_point, 10, 2)
 
         if self.is_player_in_vision() or self.damaged:
             self.new_angle = -rotate_to_cord(self.pos, self.game.player.pos) + 90
-            if distance(self.game.player.pos, self.pos) > self.detect_range // 2:
+            if distance(self.game.player.pos, self.pos) > self.stop_range:
                 self.new_pos[0] += math.cos(deg_to_rad(self.new_angle)) * self.speed
                 self.new_pos[1] += math.sin(deg_to_rad(self.new_angle)) * self.speed
             else:
@@ -690,6 +659,7 @@ class Enemy:
         self.damaged = True
         self.health -= damage
         if self.health < 1:
+            self.game.enemies_count -= 1
             self.game.objects.remove(self)
 
 
@@ -737,46 +707,51 @@ class Player:
         self.speed = speed
 
     def update(self, keys=None, mouse_position=None, mouse_buttons=None):
-        """ Update method """
-
-        # pygame.draw.line(self.game.app.DISPLAY, (255, 255, 255), self.pos,
-        #                  [self.pos[0] + math.cos(deg_to_rad(self.angle)) * self.detect_range,
-        #                   self.pos[1] + math.sin(deg_to_rad(self.angle)) * self.detect_range], 2)
         if keys is None:
             return
-        # if mouse_buttons[0] and self.recharge_counter == 0:
-        #     self.recharge_counter = 5
-        #     shoot(self)
-        # if mouse_buttons[2]:
-        #     for obj in self.game.objects:
-        #         if obj == self:
-        #             continue
-        #         # if not isinstance(obj, Explosive):
-        #         #     continue
-        #         angle = -rotate_to_cord(obj.pos, self.pos) + 90
-        #         obj.new_pos[0] += math.cos(deg_to_rad(angle)) * 10
-        #         obj.new_pos[1] += math.sin(deg_to_rad(angle)) * 10
+        if mouse_buttons[0] and self.recharge_counter == 0:
+            for i in range(10):
+                self.recharge_counter = 0
+                temp = int(self.angle)
+                self.angle += random.randint(-180, 180)
+                shoot(self)
+                self.angle = int(temp)
+        if mouse_buttons[2]:
+            for obj in self.game.objects:
+                if obj == self:
+                    continue
+                if not isinstance(obj, Explosive):
+                    continue
+                angle = -rotate_to_cord(obj.pos, self.pos) + 90
+                obj.new_pos[0] += math.cos(deg_to_rad(angle)) * 10
+                obj.new_pos[1] += math.sin(deg_to_rad(angle)) * 10
+                break
+
+        dx = dy = 0
+        if keys[pygame.K_w]:
+            dx += math.cos(deg_to_rad(self.angle)) * self.speed
+            dy += math.sin(deg_to_rad(self.angle)) * self.speed
+        if keys[pygame.K_s]:
+            dx -= math.cos(deg_to_rad(self.angle)) * self.speed
+            dy -= math.sin(deg_to_rad(self.angle)) * self.speed
+        if keys[pygame.K_d]:
+            dx += math.cos(deg_to_rad(self.angle + 90)) * self.speed
+            dy += math.sin(deg_to_rad(self.angle + 90)) * self.speed
+        if keys[pygame.K_a]:
+            dx += math.cos(deg_to_rad(self.angle - 90)) * self.speed
+            dy += math.sin(deg_to_rad(self.angle - 90)) * self.speed
+
+        for obj in self.game.objects:
+            if obj == self:
+                continue
+            obj.new_pos[0] -= dx
+            obj.new_pos[1] -= dy
 
         def smooth():
-            """ Smooth move function (also makes it possible to move objects of this class using bullets) """
-
             self.pos[0] = lerp(self.pos[0], self.new_pos[0], 0.2)
             self.pos[1] = lerp(self.pos[1], self.new_pos[1], 0.2)
 
-        # if keys[pygame.K_w]:
-        #     self.new_pos[0] += math.cos(deg_to_rad(self.angle)) * self.speed
-        #     self.new_pos[1] += math.sin(deg_to_rad(self.angle)) * self.speed
-        # if keys[pygame.K_s]:
-        #     self.new_pos[0] -= math.cos(deg_to_rad(self.angle)) * self.speed
-        #     self.new_pos[1] -= math.sin(deg_to_rad(self.angle)) * self.speed
-        # if keys[pygame.K_d]:
-        #     self.new_pos[0] += math.cos(deg_to_rad(self.angle + 90)) * self.speed
-        #     self.new_pos[1] += math.sin(deg_to_rad(self.angle + 90)) * self.speed
-        # if keys[pygame.K_a]:
-        #     self.new_pos[0] += math.cos(deg_to_rad(self.angle - 90)) * self.speed
-        #     self.new_pos[1] += math.sin(deg_to_rad(self.angle - 90)) * self.speed
-        # self.angle = -rotate_to_cord(self.pos, mouse_position) + 90
-
+        self.angle = -rotate_to_cord(self.pos, mouse_position) + 90
         pygame.draw.circle(self.game.app.DISPLAY, self.color, self.pos, self.size)
         pygame.draw.polygon(self.game.app.DISPLAY, self.color,
                             [self.pos,
@@ -789,17 +764,6 @@ class Player:
                              ], 2)
 
         smooth()
-
-        # if self.game.counter % 600 == 0:  # change every second
-        #     self.new_angle = round(self.angle) + random.randint(-90, 90)
-        #     # print(self.angle)
-        #     # print(self.new_angle)
-        #     # print("-------")
-        #
-        # self.angle = lerp(self.angle, self.new_angle, 0.02)
-        # if self.angle > 359:
-        #     self.angle = self.angle % 360
-
         if self.recharge_counter > 0:
             self.recharge_counter -= 1
 
@@ -919,7 +883,7 @@ class Explosive:
 def shoot(self):
     """ Shoot method """
 
-    max_distance = 500  # Maximum bullet range
+    max_distance = 1000  # Maximum bullet range
     bullet_direction = [math.cos(deg_to_rad(self.angle)), math.sin(deg_to_rad(self.angle))]
     bullet_end = [self.pos[0] + bullet_direction[0] * max_distance,
                   self.pos[1] + bullet_direction[1] * max_distance]
@@ -944,10 +908,10 @@ def shoot(self):
         hit_point, hit_object = closest_hit
         bullet_end = hit_point
 
-        hit_object.new_pos[0] += math.cos(deg_to_rad(self.angle)) * 20
-        hit_object.new_pos[1] += math.sin(deg_to_rad(self.angle)) * 20
+        hit_object.new_pos[0] += math.cos(deg_to_rad(self.angle)) * 1
+        hit_object.new_pos[1] += math.sin(deg_to_rad(self.angle)) * 1
 
-        hit_object.damage(1)
+        hit_object.damage(5)
 
     bullet = Bullet(self.game, self.pos, bullet_end, angle=self.angle)
     self.game.bullets.append(bullet)

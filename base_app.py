@@ -10,8 +10,14 @@ import time
 class App:
     """ Base app for pygame projects """
 
-    def __init__(self, app_name=None):
-        """ Main initialization """
+    def __init__(self, app_name=None, width=0, height=0, display_mode=pygame.FULLSCREEN):
+        """
+        Main initialization
+
+        display_mode:
+        FULLSCREEN = -2147483648
+        RESIZABLE = 16
+        """
 
         def init_display(display_width, display_height, display_mode):
             """ Display initialization """
@@ -32,9 +38,9 @@ class App:
             self.NAME = "Base App"
         else:
             self.NAME = app_name
-        self.INIT_WIDTH = 0
-        self.INIT_HEIGHT = 0
-        self.INIT_DISPLAY_MODE = pygame.FULLSCREEN
+        self.INIT_WIDTH = width
+        self.INIT_HEIGHT = height
+        self.INIT_DISPLAY_MODE = display_mode
         init_display(self.INIT_WIDTH, self.INIT_HEIGHT, self.INIT_DISPLAY_MODE)
         pygame.display.set_caption(self.NAME)
         self.CLOCK = pygame.time.Clock()
