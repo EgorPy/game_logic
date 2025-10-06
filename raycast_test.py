@@ -4,53 +4,77 @@ import math
 
 pygame.init()
 WIDTH, HEIGHT = 1280, 720
-screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Raycast Sphere + Plane NumPy")
 
-camera = np.array([0.0, 0.0, -1.0])
-sphere_center = np.array([0.0, 0.0, 3.0])
+camera = np.array([0.0, 0.0, -3.0], dtype=np.float32)
+sphere_center = np.array([0.0, 0.0, 3.0], dtype=np.float32)
 sphere_radius = 1.0
 
-fov = math.pi / 2
-running = True
-clock = pygame.time.Clock()
 compression = 4
 
-angleX = 0.0
-angleY = 0.0
-pygame.mouse.set_visible(False)
-sky_color = np.array([135, 206, 235])
+fov = np.pi / 2
+running = True
+clock = pygame.time.Clock()
 
-light_dir = np.array([1.0, 1.0, -1.0])
+angleX, angleY = 0.0, 0.0
+pygame.mouse.set_visible(False)
+
+sky_color = np.array([135, 206, 235], dtype=np.float32)
+sphere_color = np.array([255, 255, 255], dtype=np.float32)
+plane_color = np.array([200, 200, 200], dtype=np.float32)
+light_dir = np.array([1.0, 1.0, -1.0], dtype=np.float32)
 light_dir /= np.linalg.norm(light_dir)
 
-def rotate_camera(v, ax, ay):
-    sinY, cosY = math.sin(ax), math.cos(ax)
-    sinX, cosX = math.sin(ay), math.cos(ay)
-    # Поворот Y
-    xz_x = v[..., 0] * cosY + v[..., 2] * sinY
-    xz_z = -v[..., 0] * sinY + v[..., 2] * cosY
-    xz_y = v[..., 1]
-    # Поворот X
-    yz_y = xz_y * cosX - xz_z * sinX
-    yz_z = xz_y * sinX + xz_z * cosX
-    return np.stack([xz_x, yz_y, yz_z], axis=-1)
+plane_y = -1.5  # высота пола
+
+# Предвычисляем координаты пикселей в сжатом виде
+h_c = HEIGHT // compression
+w_c = WIDTH // compression
+xs_c = (2 * (np.arange(w_c) + 0.5) / w_c - 1) * np.tan(fov / 2) * WIDTH / HEIGHT
+ys_c = -(2 * (np.arange(h_c) + 0.5) / h_c - 1) * np.tan(fov / 2)
+px_c, py_c = np.meshgrid(xs_c, ys_c)
+pz_c = np.ones_like(px_c)
+ray_dirs_c = np.stack([px_c, py_c, pz_c], axis=-1)
+ray_dirs_c /= np.linalg.norm(ray_dirs_c, axis=-1, keepdims=True)
+
+def rotate_rays(rays, forward, right, up):
+    rotated = rays[...,0][...,np.newaxis]*right + \
+              rays[...,1][...,np.newaxis]*up + \
+              rays[...,2][...,np.newaxis]*forward
+    rotated /= np.linalg.norm(rotated, axis=-1, keepdims=True)
+    return rotated
+
+
 
 while running:
     for e in pygame.event.get():
         if e.type == pygame.QUIT:
             running = False
 
-    dx = pygame.mouse.get_pos()[0] - WIDTH // 2
-    dy = pygame.mouse.get_pos()[1] - HEIGHT // 2
-    angleX += dx * 0.002
-    angleY += dy * 0.002
+    dx, dy = np.array(pygame.mouse.get_pos()) - np.array([WIDTH // 2, HEIGHT // 2])
+    angleX -= dx * 0.002
+    angleY -= dy * 0.002
     pygame.mouse.set_pos((WIDTH // 2, HEIGHT // 2))
 
     keys = pygame.key.get_pressed()
-    speed = 2.0 if keys[pygame.K_LCTRL] else 0.2
-    forward = np.array([math.sin(angleX), 0, math.cos(angleX)])
-    right = np.array([math.cos(angleX), 0, -math.sin(angleX)])
-    up = np.array([0, 1, 0])
+    speed = 2.0 if keys[pygame.K_LCTRL] else 0.1
+    # горизонтальный угол
+    cosX, sinX = math.cos(angleX), math.sin(angleX)
+    # вертикальный угол
+    cosY, sinY = math.cos(angleY), math.sin(angleY)
+
+    forward = np.array([
+        math.sin(angleX) * math.cos(angleY),  # x
+        math.sin(angleY),  # y
+        math.cos(angleX) * math.cos(angleY)  # z
+    ], dtype=np.float32)
+
+    right = np.cross(forward, np.array([0, 1, 0], dtype=np.float32))
+    right /= np.linalg.norm(right)
+
+    up = np.cross(right, forward)
+    up /= np.linalg.norm(up)
 
     if keys[pygame.K_w]: camera += forward * speed
     if keys[pygame.K_s]: camera -= forward * speed
@@ -59,42 +83,52 @@ while running:
     if keys[pygame.K_SPACE]: camera += up * speed
     if keys[pygame.K_LSHIFT]: camera -= up * speed
 
-    screen.fill(sky_color)
+    screen_array = np.tile(sky_color, (h_c, w_c, 1))
+    rays = rotate_rays(ray_dirs_c, forward, right, up)
 
-    xs = np.arange(0, WIDTH, compression)
-    ys = np.arange(0, HEIGHT, compression)
-    px, py = np.meshgrid(xs, ys)
-    px = (2 * (px + 0.5) / WIDTH - 1) * math.tan(fov / 2) * WIDTH / HEIGHT
-    py = -(2 * (py + 0.5) / HEIGHT - 1) * math.tan(fov / 2)
-    ray_dirs = np.stack([px, py, np.ones_like(px)], axis=-1)
-    ray_dirs = rotate_camera(ray_dirs, angleX, angleY)
-    ray_dirs /= np.linalg.norm(ray_dirs, axis=-1)[..., None]
-
+    # --- Сфера ---
     oc = camera - sphere_center
-    a = np.sum(ray_dirs**2, axis=-1)
-    b = 2 * np.sum(oc * ray_dirs, axis=-1)
-    c = np.sum(oc**2) - sphere_radius**2
+    a = np.sum(rays * rays, axis=-1)
+    b = 2 * np.sum(oc * rays, axis=-1)
+    c = np.sum(oc * oc) - sphere_radius**2
     disc = b**2 - 4*a*c
+    mask_sphere = disc >= 0
+    t_sphere = np.zeros_like(disc)
+    t_sphere[mask_sphere] = (-b[mask_sphere] - np.sqrt(disc[mask_sphere])) / (2*a[mask_sphere])
+    mask_sphere &= t_sphere > 0
+    t_sphere_final = np.where(mask_sphere, t_sphere, np.inf)
 
-    hit_mask = disc >= 0
-    t = np.zeros_like(a)
-    t[hit_mask] = (-b[hit_mask] - np.sqrt(disc[hit_mask])) / (2*a[hit_mask])
-    t[t < 0] = 0
-    hit_mask &= t > 0
+    # --- Плоскость ---
+    # y = plane_y => t_plane = (plane_y - camera_y) / ray_y
+    t_plane = (plane_y - camera[1]) / rays[..., 1]
+    mask_plane = (t_plane > 0)
+    t_plane_final = np.where(mask_plane, t_plane, np.inf)
 
-    # Цвета
-    color = np.zeros(ray_dirs.shape, dtype=np.float32)
-    hit_points = camera + ray_dirs * t[..., None]
-    normals = hit_points - sphere_center
-    normals /= np.linalg.norm(normals, axis=-1)[..., None]
-    brightness = np.clip(np.sum(normals * light_dir, axis=-1), 0.2, 1.0)
-    cvals = ((sky_color + 240) / 510 * 255 * brightness[..., None]).astype(np.uint8)
+    # --- Выбираем ближайший объект ---
+    mask_sphere_final = t_sphere_final < t_plane_final
+    mask_plane_final = ~mask_sphere_final & (t_plane_final != np.inf)
 
-    # Рисуем пиксели
-    for i in range(ys.shape[0]):
-        for j in range(xs.shape[0]):
-            if hit_mask[i, j]:
-                pygame.draw.rect(screen, cvals[i, j], (xs[j], ys[i], compression, compression))
+    # Рендер сферы
+    if np.any(mask_sphere_final):
+        hit = camera + rays * t_sphere_final[..., np.newaxis]
+        normal = hit - sphere_center
+        normal /= np.linalg.norm(normal, axis=-1, keepdims=True)
+        brightness = np.clip(np.sum(normal * light_dir, axis=-1), 0.2, 1.0)
+        for i in range(3):
+            screen_array[..., i][mask_sphere_final] = sphere_color[i] * brightness[mask_sphere_final]
+
+    # Рендер плоскости
+    if np.any(mask_plane_final):
+        hit_plane = camera + rays * t_plane_final[..., np.newaxis]
+        # Плоскость горизонтальная, нормаль (0,1,0)
+        normal = np.array([0, 1, 0], dtype=np.float32)
+        brightness = np.clip(np.sum(normal * light_dir), 0.2, 1.0)
+        for i in range(3):
+            screen_array[..., i][mask_plane_final] = plane_color[i] * brightness
+
+    # Масштабирование обратно
+    screen_array_full = np.repeat(np.repeat(screen_array, compression, axis=0), compression, axis=1)
+    pygame.surfarray.blit_array(screen, np.transpose(screen_array_full[:HEIGHT, :WIDTH], (1,0,2)).astype(np.uint8))
 
     pygame.display.flip()
     clock.tick(30)
